@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/edaniels/golog"
 	"go.uber.org/multierr"
 	"go.viam.com/rdk/components/motor"
+	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 
 	"viam-labs/viam-appliedmotion/common"
@@ -24,7 +24,7 @@ var Model = resource.NewModel("viam-labs", "appliedmotion", "st")
 type st struct {
 	resource.Named
 	mu          sync.RWMutex
-	logger      golog.Logger
+	logger      logging.Logger
 	cancelCtx   context.Context
 	cancelFunc  func()
 	comm        commPort
@@ -50,7 +50,7 @@ func init() {
 		resource.Registration[motor.Motor, *Config]{Constructor: newMotor})
 }
 
-func newMotor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger golog.Logger) (motor.Motor, error) {
+func newMotor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger logging.Logger) (motor.Motor, error) {
 	logger.Infof("Starting Applied Motion Products ST Motor Driver %s", common.Version)
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
@@ -121,7 +121,7 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	return nil
 }
 
-func getComm(ctx context.Context, conf *Config, logger golog.Logger) (commPort, error) {
+func getComm(ctx context.Context, conf *Config, logger logging.Logger) (commPort, error) {
 	switch {
 	case strings.ToLower(conf.Protocol) == "can":
 		return nil, fmt.Errorf("unsupported comm type %s", conf.Protocol)
@@ -253,13 +253,6 @@ func (s *st) Close(ctx context.Context) error {
 }
 
 func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
-	if positionRevolutions == 0 {
-		// This is a special sentinel value to move forever.
-		powerLevel := rpm / s.rpmLimits.max
-		return s.SetPower(ctx, powerLevel, extra)
-	}
-
-	// Otherwise, do a normal GoFor.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debugf("GoFor: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
@@ -287,6 +280,11 @@ func (s *st) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 
 	// Send the configuration commands to setup the motor for the move
 	return s.configuredMove(ctx, "FP", positionRevolutions, rpm, extra)
+}
+
+func (s *st) SetRPM(ctx context.Context, rpm float64, extra map[string]interface{}) error {
+	powerLevel := rpm / s.rpmLimits.max
+	return s.SetPower(ctx, powerLevel, extra)
 }
 
 func (s *st) configuredMove(

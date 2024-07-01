@@ -11,20 +11,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/edaniels/golog"
+	"go.viam.com/rdk/logging"
 )
 
 type commPort = *comms
 
 type comms struct {
 	mu     sync.RWMutex
-	logger golog.Logger
+	logger logging.Logger
 	ctx    context.Context
 	uri    string
 	handle io.ReadWriteCloser
 }
 
-func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger golog.Logger) (commPort, error) {
+func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger logging.Logger) (commPort, error) {
 	logger.Debugf("Dialing %s", uri)
 	d := net.Dialer{
 		Timeout:   timeout,
@@ -38,7 +38,7 @@ func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger go
 	return &comms{handle: socket, uri: uri, logger: logger, mu: sync.RWMutex{}}, nil
 }
 
-func newSerialComm(ctx context.Context, file string, logger golog.Logger) (commPort, error) {
+func newSerialComm(ctx context.Context, file string, logger logging.Logger) (commPort, error) {
 	logger.Debugf("Opening %s", file)
 	if fd, err := os.OpenFile(file, os.O_RDWR, fs.FileMode(os.O_RDWR)); err != nil {
 		return nil, err
